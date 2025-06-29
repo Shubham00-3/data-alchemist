@@ -79,7 +79,6 @@ const Index = () => {
   };
 
   const handleAIValidation = () => {
-    // Re-run all validators
     const clientErrors = validateClientsData(clientsData);
     const workerErrors = validateWorkersData(workersData);
     const taskErrors = validateTasksData(tasksData);
@@ -88,10 +87,8 @@ const Index = () => {
     setWorkersErrors(workerErrors);
     setTasksErrors(taskErrors);
   
-    // Calculate total errors
     const totalErrors = clientErrors.length + workerErrors.length + taskErrors.length;
   
-    // Show a toast notification!
     if (totalErrors > 0) {
       toast.error(`Validation complete. Found ${totalErrors} error(s).`);
     } else {
@@ -101,16 +98,15 @@ const Index = () => {
 
   const handleAIFixClick = async (row: number, column: string, dataType: 'clients' | 'workers' | 'tasks') => {
     const errors = dataType === 'clients' ? clientsErrors :
-                     dataType === 'workers' ? workersErrors : tasksErrors;
+                   dataType === 'workers' ? workersErrors : tasksErrors;
     const error = errors.find(e => e.row === row && e.column === column);
   
     const data = dataType === 'clients' ? clientsData :
-                     dataType === 'workers' ? workersData : tasksData;
+                 dataType === 'workers' ? workersData : tasksData;
     const currentValue = String(data[row][column]);
   
     if (error) {
       try {
-        // Step 1: Call the backend to get a real AI suggestion
         toast.info("Asking AI for a suggestion...");
         const response = await fetch('/api/get-suggestion', {
           method: 'POST',
@@ -128,14 +124,13 @@ const Index = () => {
   
         const { suggestion } = await response.json();
   
-        // Step 2: If a suggestion is returned, open the modal with it
         if (suggestion) {
           setAIFixModal({
             isOpen: true,
             row,
             column,
             currentValue,
-            suggestion, // Use the fetched suggestion
+            suggestion,
             dataType
           });
         } else {
