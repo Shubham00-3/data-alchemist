@@ -32,16 +32,32 @@ export const DataUploadSection = ({ onDataUpload }: DataUploadSectionProps) => {
     });
   };
 
-  const handleFileUpload = (dataType: 'clients' | 'workers' | 'tasks', file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const csvText = e.target?.result as string;
-      const data = parseCSV(csvText);
-      onDataUpload(dataType, data);
-      setUploadStatus(prev => ({ ...prev, [dataType]: data.length }));
-    };
-    reader.readAsText(file);
-  };
+  // src/components/DataUploadSection.tsx
+
+const handleFileUpload = async (dataType: 'clients' | 'workers' | 'tasks', file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('dataType', dataType);
+
+  try {
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('File upload failed');
+    }
+
+    const data = await response.json();
+    onDataUpload(dataType, data.data);
+    setUploadStatus(prev => ({ ...prev, [dataType]: data.data.length }));
+
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    // You can add a user-facing error message here
+  }
+};
 
   const FileUploader = ({ 
     type, 
