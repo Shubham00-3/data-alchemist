@@ -20,7 +20,6 @@ const groq = new Groq({
 });
 
 const app = express();
-// Use the PORT environment variable provided by Render, or default to 3001 for local development
 const port = process.env.PORT || 3001;
 
 app.use(cors());
@@ -125,7 +124,25 @@ app.post('/api/propose-modification', async (req, res) => {
     if (!command || !data || !dataType) {
         return res.status(400).json({ error: 'Missing command, data, or dataType.' });
     }
-    const prompt = `You are a data modification assistant...`; // Abridged for clarity
+    // This is the full, unabridged prompt
+    const prompt = `
+        You are a data modification assistant. A user has provided a dataset and a command in natural language.
+        Your task is to return a JSON object with a 'modifications' array. Each object in the array should represent a single cell change and must have three keys: 'rowIndex' (the 0-based index of the row to change), 'column' (the string name of the column to change), and 'newValue' (the new value for the cell).
+
+        - The dataset is of type: '${dataType}'.
+        - The user's command is: '${command}'.
+        - The data is: ${JSON.stringify(data.slice(0, 15))}
+
+        Analyze the command and the data, then return only the JSON object. Do not include any other text or explanations.
+        If the command is unclear or cannot be translated into modifications, return an empty 'modifications' array.
+
+        Example response for a command like "set priority to 5 for client id C03":
+        {
+          "modifications": [
+            { "rowIndex": 2, "column": "PriorityLevel", "newValue": "5" }
+          ]
+        }
+    `;
     try {
         const chatCompletion = await groq.chat.completions.create({
             messages: [{ role: "system", content: "You are a data modification assistant that only responds with JSON." }, { role: "user", content: prompt }],
@@ -134,8 +151,9 @@ app.post('/api/propose-modification', async (req, res) => {
             response_format: { type: "json_object" },
         });
         const aiResponse = chatCompletion.choices[0]?.message?.content || '{}';
+        console.log("Groq modification proposal:", aiResponse);
         const proposal = JSON.parse(aiResponse);
-        proposal.summary = `The AI proposes making ${proposal.modifications?.length || 0} change(s)...`; // Abridged
+        proposal.summary = `The AI proposes making ${proposal.modifications?.length || 0} change(s) based on your command. Please review before confirming.`;
         res.status(200).json(proposal);
     } catch (e) {
         console.error("Error calling Groq for modification:", e);
@@ -148,7 +166,28 @@ app.post('/api/recommend-rules', async (req, res) => {
     if (!data || !dataType) {
         return res.status(400).json({ error: 'Missing data or dataType for recommendations.' });
     }
-    const prompt = `You are an expert data analysis assistant...`; // Abridged for clarity
+    // This is the full, unabridged prompt
+    const prompt = `
+        You are an expert data analysis assistant. A user has uploaded a dataset of type '${dataType}'.
+        Your task is to analyze a sample of the data and suggest helpful validation or operational rules.
+        Return a JSON object with a 'recommendations' array. Each object in the array should have two keys: 'id' (a unique short identifier) and 'description' (a human-readable string describing the suggested rule).
+
+        - The data is: ${JSON.stringify(data.slice(0, 15))}
+
+        Look for patterns like:
+        - Are certain tasks always requested together? (Suggest a "Co-run" rule).
+        - Are some workers consistently assigned more tasks than their max load? (Suggest a "Load-limit" rule).
+        - Do certain task categories have specific phase requirements? (Suggest a "Phase-window" rule).
+
+        Return only the JSON object. Do not include any other text. If no obvious patterns are found, return an empty 'recommendations' array.
+
+        Example Response:
+        {
+          "recommendations": [
+            { "id": "corun_t1_t5", "description": "Tasks T1 and T5 are often requested together. Create a 'Co-run' rule for them?" }
+          ]
+        }
+    `;
     try {
         const chatCompletion = await groq.chat.completions.create({
             messages: [{ role: "system", content: "You are a data analysis assistant that only responds with JSON." }, { role: "user", content: prompt }],
@@ -157,6 +196,7 @@ app.post('/api/recommend-rules', async (req, res) => {
             response_format: { type: "json_object" },
         });
         const aiResponse = chatCompletion.choices[0]?.message?.content || '{}';
+        console.log("Groq rule recommendations:", aiResponse);
         res.status(200).json(JSON.parse(aiResponse));
     } catch (e) {
         console.error("Error calling Groq for rule recommendations:", e);
